@@ -55,17 +55,13 @@ internal sealed class CaptureSession : IAsyncDisposable
             await Source.StartAsync(Request, ct).ConfigureAwait(false);
             StartedAt = DateTimeOffset.UtcNow;
             State = CaptureSessionState.Running;
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-                _logger.LogInformation("Session {SessionId} started ({Source}).",
-                    Id, SourceName);
-            }
+            Log.SessionStarted(_logger, Id, SourceName);
         }
         catch (Exception ex)
         {
             Error = ex.Message;
             State = CaptureSessionState.Failed;
-            _logger.LogError(ex, "Session {SessionId} failed to start.", Id);
+            Log.SessionStartFailed(_logger, ex, Id);
             throw;
         }
     }
@@ -84,18 +80,13 @@ internal sealed class CaptureSession : IAsyncDisposable
             await Source.StopAsync(ct).ConfigureAwait(false);
             StoppedAt = DateTimeOffset.UtcNow;
             State = CaptureSessionState.Completed;
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-                _logger.LogInformation(
-                    "Session {SessionId} completed ({Packets} packets, {Bytes} bytes).",
-                    Id, Source.PacketCount, Source.ByteCount);
-            }
+            Log.SessionCompleted(_logger, Id, Source.PacketCount, Source.ByteCount);
         }
         catch (Exception ex)
         {
             Error = ex.Message;
             State = CaptureSessionState.Failed;
-            _logger.LogError(ex, "Session {SessionId} failed to stop.", Id);
+            Log.SessionStopFailed(_logger, ex, Id);
             throw;
         }
     }
@@ -127,7 +118,7 @@ internal sealed class CaptureSession : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Session {SessionId} dispose error.", Id);
+            Log.SessionDisposeError(_logger, ex, Id);
         }
         try
         {
@@ -138,8 +129,7 @@ internal sealed class CaptureSession : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex,
-                "Session {SessionId} folder cleanup error.", Id);
+            Log.SessionFolderCleanupError(_logger, ex, Id);
         }
         State = CaptureSessionState.Disposed;
         _lock.Dispose();

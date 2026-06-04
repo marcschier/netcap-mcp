@@ -137,8 +137,7 @@ internal sealed class CaptureSessionManager : IHostedService, IAsyncDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex,
-                    "Evicted session {SessionId} dispose error.", session.Id);
+                Log.EvictedSessionDisposeError(_logger, ex, session.Id);
             }
         });
     }
@@ -161,8 +160,7 @@ internal sealed class CaptureSessionManager : IHostedService, IAsyncDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex,
-                    "Session {SessionId} dispose error.", session.Id);
+                Log.SessionDisposeError(_logger, ex, session.Id);
             }
         }
         _sessions.Clear();
@@ -175,8 +173,7 @@ internal sealed class CaptureSessionManager : IHostedService, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex,
-                "Root folder cleanup error: {Folder}", _rootFolder);
+            Log.RootFolderCleanupError(_logger, ex, _rootFolder);
         }
     }
 }

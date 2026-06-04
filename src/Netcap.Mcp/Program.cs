@@ -103,16 +103,11 @@ internal static class Program
         }
         else
         {
-            logger.LogWarning(
-                "Netcap.Mcp HTTP transport listening on {Bind}:{Port} with " +
-                "loopback restriction DISABLED. Local-dev only.", bind, port);
+            Log.HttpTransportLoopbackDisabled(logger, bind, port);
         }
 
         app.MapMcp();
-        if (logger.IsEnabled(LogLevel.Information))
-        {
-            logger.LogInformation("Netcap.Mcp HTTP transport ready at {Url}", url);
-        }
+        Log.HttpTransportReady(logger, url);
         await app.RunAsync().ConfigureAwait(false);
         return 0;
     }

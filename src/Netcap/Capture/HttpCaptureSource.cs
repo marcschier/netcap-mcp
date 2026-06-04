@@ -111,10 +111,7 @@ internal sealed class HttpCaptureSource : ICaptureSource
         _loopCts = new CancellationTokenSource();
         _loopTask = Task.Run(() => AcceptLoopAsync(_loopCts.Token), _loopCts.Token);
 
-        if (_logger.IsEnabled(LogLevel.Information))
-        {
-            _logger.LogInformation("http source listening on {Url}", prefix);
-        }
+        Log.HttpSourceListening(_logger, prefix);
         return Task.CompletedTask;
     }
 
@@ -188,7 +185,7 @@ internal sealed class HttpCaptureSource : ICaptureSource
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "http source request handling error");
+            Log.HttpRequestHandlingError(_logger, ex);
         }
     }
 

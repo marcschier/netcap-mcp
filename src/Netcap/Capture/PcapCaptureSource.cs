@@ -106,12 +106,7 @@ internal sealed class PcapCaptureSource : ICaptureSource
             {
                 throw;
             }
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-                _logger.LogInformation(
-                    "Failed promiscuous open on {Device}, falling back to normal mode.",
-                    selected.Name);
-            }
+            Log.PcapPromiscuousFallback(_logger, selected.Name);
             selected.Open(mode: DeviceModes.None, read_timeout: 1000);
         }
 
@@ -127,12 +122,8 @@ internal sealed class PcapCaptureSource : ICaptureSource
         _device = selected;
         _startedAt = DateTimeOffset.UtcNow;
 
-        if (_logger.IsEnabled(LogLevel.Information))
-        {
-            _logger.LogInformation(
-                "pcap source capturing on {Device} ({LinkType}) filter={Filter}",
-                selected.Name, LinkType, request.BpfFilter ?? "<none>");
-        }
+        Log.PcapSourceCapturing(_logger, selected.Name, LinkType,
+            request.BpfFilter ?? "<none>");
 
 #pragma warning disable CA1849 // StartCapture is the SharpPcap blocking API.
         selected.StartCapture();
