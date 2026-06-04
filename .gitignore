@@ -1,0 +1,29 @@
+# Build artifacts
+bin/
+obj/
+artifacts/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Test results
+TestResults/
+*.trx
+coverage/
+*.coverage
+*.coveragexml
+
+# Tooling
+.dotnet/
+.nuget/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

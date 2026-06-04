@@ -1,0 +1,25 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{md,yml,yaml}]
+indent_size = 2
+
+[*.{csproj,props,targets,slnx}]
+indent_size = 2
+
+[*.cs]
+# .NET defaults; the code happens to follow stricter conventions but
+# we don't enforce them via the editorconfig in this repo.
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = inside_namespace:suggestion
+csharp_style_namespace_declarations = file_scoped:suggestion
+
+# Don't fail the build over warnings.
+dotnet_analyzer_diagnostic.category-Style.severity = suggestion
