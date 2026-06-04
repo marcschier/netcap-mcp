@@ -50,12 +50,12 @@ jobs:
 
       - name: Pack (Linux only)
         if: matrix.os == 'ubuntu-latest'
-        run: dotnet pack src/NetcapMcp/NetcapMcp.csproj --configuration Release --no-build --output artifacts
+        run: dotnet pack Netcap.slnx --configuration Release --no-build --output artifacts
 
-      - name: Upload nupkg artifact (Linux only)
+      - name: Upload nupkg artifacts (Linux only)
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: NetcapMcp-nupkg
+          name: netcap-nupkg
           path: artifacts/*.nupkg
           if-no-files-found: error

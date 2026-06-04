@@ -1,16 +1,25 @@
-# NetcapMcp
+# Netcap
 
 [![ci](https://github.com/marcschier/netcap/actions/workflows/ci.yml/badge.svg)](https://github.com/marcschier/netcap/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-A [Model Context Protocol](https://modelcontextprotocol.io/) server that
-captures network traces and returns them as **pcap**, **pcapng**, **JSON**,
-**CSV**, or **text** — driven by an MCP-aware client (LLM agent, IDE, CLI
-tool). Installs as a [.NET tool](https://learn.microsoft.com/dotnet/core/tools/global-tools)
+A **Model Context Protocol** server that captures network traces and
+returns them as **pcap**, **pcapng**, **JSON**, **CSV**, or **text** — driven
+by an MCP-aware client (LLM agent, IDE, CLI tool). Installs as a
+[.NET tool](https://learn.microsoft.com/dotnet/core/tools/global-tools)
 or runs in Docker.
 
 > ⚠️ Packet capture is invasive and the resulting traces may contain
 > sensitive data. Treat them with care.
+
+## Packages
+
+The repo ships two NuGet packages:
+
+| Package        | Purpose                                                      |
+|----------------|--------------------------------------------------------------|
+| **`Netcap`**     | Capture engine library — `ICaptureSource`, pcap & passive-http sources, pcap/pcapng/json/csv/text formatters, session manager. Reusable from any .NET app. |
+| **`Netcap.Mcp`** | MCP server that exposes the engine as MCP tools. Packaged as a `dotnet tool` with command **`netcap-mcp`** (stdio + HTTP transports). |
 
 ## Features
 
@@ -30,12 +39,39 @@ or runs in Docker.
   default, ≤ 30 minutes per `start_capture`, ≤ 60 s `capture_now`,
   ≤ 8 active sessions, LRU eviction beyond 32 retained sessions.
 
+## Register the MCP server in an MCP client via `dnx` (.NET 10)
+
+.NET 10 ships a `dnx` script that runs a .NET tool **without a global
+install** — a one-shot launcher in the spirit of `npx`. This is the
+easiest way to wire `netcap-mcp` into an MCP client config:
+
+```jsonc
+{
+  "mcpServers": {
+    "netcap": {
+      "command": "dnx",
+      "args": ["--yes", "Netcap.Mcp", "--stdio"]
+    }
+  }
+}
+```
+
+Notes:
+- `dnx` forwards to `dotnet tool exec`. The first invocation downloads
+  the `Netcap.Mcp` package from NuGet; `--yes` skips the per-download
+  confirmation prompt.
+- Pin a specific version with `Netcap.Mcp@1.0.0` (or any tagged
+  release).
+- Anything after the package name is passed straight to the tool, so
+  `--stdio` (or `--http --port 3001`) lands on the server.
+- Requires the .NET 10 SDK on the machine running the MCP client.
+
 ## Install
 
-### As a .NET tool
+### As a global .NET tool
 
 ```bash
-dotnet tool install --global NetcapMcp
+dotnet tool install --global Netcap.Mcp
 netcap-mcp --stdio                       # default
 netcap-mcp --http --port 3001            # ASP.NET Core HTTP transport
 netcap-mcp --help
@@ -46,32 +82,20 @@ netcap-mcp --help
 ```bash
 git clone https://github.com/marcschier/netcap.git
 cd netcap
-dotnet run --project src/NetcapMcp -- --stdio
+dotnet run --project src/Netcap.Mcp -- --stdio
 ```
 
 ### Docker
 
 ```bash
-docker build -t netcap-mcp .
+docker build -t netcap-mcp -f src/Netcap.Mcp/Dockerfile .
 docker run --rm -it --cap-add=NET_ADMIN -p 127.0.0.1:3001:3001 netcap-mcp
 ```
 
-`--cap-add=NET_ADMIN` is required for the `pcap` source on Linux.
-
-## Wiring into an MCP client
-
-Example launcher config for an MCP client that supports stdio servers:
-
-```jsonc
-{
-  "mcpServers": {
-    "netcap": {
-      "command": "netcap-mcp",
-      "args": ["--stdio"]
-    }
-  }
-}
-```
+`--cap-add=NET_ADMIN` is required for the `pcap` source on Linux. The
+Docker build context is the repo root because the Dockerfile copies
+`Directory.Build.props`, `Directory.Packages.props`, `version.json`, and
+both `src/Netcap/` and `src/Netcap.Mcp/`.
 
 ## Tools
 
@@ -81,7 +105,7 @@ Example launcher config for an MCP client that supports stdio servers:
 | `start_capture`     | Begin a session. `source=pcap`: requires `interfaceName`, optional `bpfFilter`. `source=http`: optional `listenPort`. Returns the session id. |
 | `stop_capture`      | Stop and finalise. Safe to read the trace once this returns. |
 | `list_captures`     | List sessions. Filter with `state` ∈ `active`, `completed`, `all`. |
-| `get_capture`       | Return the trace in `pcap`/`pcapng`/`json`/`csv`/`text`. Binary formats come back as `EmbeddedResourceBlock` + `BlobResourceContents`. |
+| `get_capture`       | Return the trace in `pcap` / `pcapng` / `json` / `csv` / `text`. Binary formats come back as `EmbeddedResourceBlock` + `BlobResourceContents`. |
 | `capture_now`       | Start + sleep + stop + format in one call (cleanup guaranteed). |
 | `summarize_capture` | Counts plus top-N talkers / protocols / ports for a completed session. |
 
@@ -115,9 +139,39 @@ Example launcher config for an MCP client that supports stdio servers:
 - `pcapng` is produced by a built-in minimal writer
   (Section Header + Interface Description + Enhanced Packet blocks).
 
+## Project layout
+
+```
+netcap/
+├── Netcap.slnx
+├── Directory.Build.props
+├── Directory.Packages.props
+├── version.json
+├── README.md
+├── LICENSE
+├── .github/workflows/ci.yml
+├── src/
+│   ├── Netcap/                       capture engine library
+│   │   ├── Netcap.csproj
+│   │   ├── NetcapException.cs
+│   │   ├── Capture/                  ICaptureSource, sources, session manager
+│   │   ├── Formats/                  pcap/pcapng/json/csv/text formatters + decoder
+│   │   └── Models/                   request / response DTOs
+│   └── Netcap.Mcp/                   MCP server (dotnet tool)
+│       ├── Netcap.Mcp.csproj
+│       ├── Program.cs                CLI + transport selection
+│       ├── CaptureTools.cs           [McpServerTool] methods
+│       ├── ServiceCollectionExtensions.cs
+│       ├── Dockerfile
+│       └── .dockerignore
+└── tests/
+    ├── Netcap.Tests/                 capture engine tests (xUnit + Moq)
+    └── Netcap.Mcp.Tests/             MCP-tool layer tests
+```
+
 ## Adding a new capture source
 
-1. Implement `ICaptureSource` in `src/NetcapMcp/Capture/`.
+1. Implement `ICaptureSource` in `src/Netcap/Capture/`.
 2. Register it in `CaptureSourceFactory` under a new name.
 3. Declare which `FormatKind`s your source supports via
    `SupportedFormats` — formatters honour this set.
@@ -128,7 +182,7 @@ Example launcher config for an MCP client that supports stdio servers:
 dotnet restore -s https://api.nuget.org/v3/index.json
 dotnet build  -c Release
 dotnet test   -c Release
-dotnet pack   src/NetcapMcp/NetcapMcp.csproj -c Release -o artifacts
+dotnet pack   src/Netcap.Mcp/Netcap.Mcp.csproj -c Release -o artifacts
 ```
 
 CI runs the same on `ubuntu-latest` and `windows-latest` on every push

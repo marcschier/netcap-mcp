@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/NetcapMcp/NetcapMcp.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/NetcapMcp.Tests/NetcapMcp.Tests.csproj" />
-  </Folder>
-</Solution>

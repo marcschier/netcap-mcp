@@ -3,7 +3,7 @@
     <Authors>Marc Schier</Authors>
     <Company>Marc Schier</Company>
     <Copyright>© Marc Schier. Licensed under the Apache License, Version 2.0.</Copyright>
-    <Product>NetcapMcp</Product>
+    <Product>Netcap.Mcp</Product>
     <RepositoryUrl>https://github.com/marcschier/netcap</RepositoryUrl>
     <PackageProjectUrl>https://github.com/marcschier/netcap</PackageProjectUrl>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
