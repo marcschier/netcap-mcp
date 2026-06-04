@@ -2,6 +2,8 @@
 
 [![ci](https://github.com/marcschier/netcap/actions/workflows/ci.yml/badge.svg)](https://github.com/marcschier/netcap/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Netcap.Mcp on GitHub Packages](https://img.shields.io/badge/GitHub%20Packages-Netcap.Mcp-2088FF?logo=github)](https://github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp)
+[![Netcap on GitHub Packages](https://img.shields.io/badge/GitHub%20Packages-Netcap-2088FF?logo=github)](https://github.com/marcschier/netcap/pkgs/nuget/Netcap)
 
 A **Model Context Protocol** server that captures network traces and
 returns them as **pcap**, **pcapng**, **JSON**, **CSV**, or **text** — driven
@@ -14,12 +16,34 @@ or runs in Docker.
 
 ## Packages
 
-The repo ships two NuGet packages:
+Both packages are published to **GitHub Packages** (NuGet feed) for the
+`marcschier` user on every push to `main` by the
+[CI workflow](.github/workflows/ci.yml).
 
-| Package        | Purpose                                                      |
-|----------------|--------------------------------------------------------------|
-| **`Netcap`**     | Capture engine library — `ICaptureSource`, pcap & passive-http sources, pcap/pcapng/json/csv/text formatters, session manager. Reusable from any .NET app. |
-| **`Netcap.Mcp`** | MCP server that exposes the engine as MCP tools. Packaged as a `dotnet tool` with command **`netcap-mcp`** (stdio + HTTP transports). |
+| Package        | Feed                                                                                                       | Purpose                                                                                                                          |
+|----------------|------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| **`Netcap`**     | [github.com/marcschier/netcap/pkgs/nuget/Netcap](https://github.com/marcschier/netcap/pkgs/nuget/Netcap)         | Capture engine library — `ICaptureSource`, pcap & passive-http sources, pcap/pcapng/json/csv/text formatters, session manager.   |
+| **`Netcap.Mcp`** | [github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp](https://github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp) | MCP server that exposes the engine as MCP tools. Packaged as a `dotnet tool` with command **`netcap-mcp`** (stdio + HTTP).        |
+
+### Adding the GitHub Packages feed
+
+GitHub Packages NuGet **requires authentication even for public
+packages**. Generate a [classic personal access token](https://github.com/settings/tokens)
+with the `read:packages` scope (no other scope is needed for read-only
+consumption), then add the feed once:
+
+```bash
+dotnet nuget add source \
+    --name marcschier \
+    --username <your-github-username> \
+    --password <YOUR_GITHUB_PAT_WITH_read:packages> \
+    --store-password-in-clear-text \
+    "https://nuget.pkg.github.com/marcschier/index.json"
+```
+
+After this, every example below works against the GitHub Packages feed.
+To use a different name for the source, replace `marcschier` and the
+`--source marcschier` flags accordingly.
 
 ## Features
 
@@ -42,15 +66,21 @@ The repo ships two NuGet packages:
 ## Register the MCP server in an MCP client via `dnx` (.NET 10)
 
 .NET 10 ships a `dnx` script that runs a .NET tool **without a global
-install** — a one-shot launcher in the spirit of `npx`. This is the
-easiest way to wire `netcap-mcp` into an MCP client config:
+install** — a one-shot launcher in the spirit of `npx`. Once the
+GitHub Packages feed is configured (see above), wire `netcap-mcp` into
+an MCP client config like this:
 
 ```jsonc
 {
   "mcpServers": {
     "netcap": {
       "command": "dnx",
-      "args": ["--yes", "Netcap.Mcp", "--stdio"]
+      "args": [
+        "--yes",
+        "--source", "https://nuget.pkg.github.com/marcschier/index.json",
+        "Netcap.Mcp",
+        "--stdio"
+      ]
     }
   }
 }
@@ -58,24 +88,33 @@ easiest way to wire `netcap-mcp` into an MCP client config:
 
 Notes:
 - `dnx` forwards to `dotnet tool exec`. The first invocation downloads
-  the `Netcap.Mcp` package from NuGet; `--yes` skips the per-download
-  confirmation prompt.
-- Pin a specific version with `Netcap.Mcp@1.0.0` (or any tagged
-  release).
+  the `Netcap.Mcp` package from the configured source(s); `--yes` skips
+  the per-download confirmation prompt.
+- The `--source` argument is only required if the GitHub Packages feed
+  is not already present in your global `NuGet.config`. If you ran
+  `dotnet nuget add source` above, you can omit it (and the global
+  credentials are picked up automatically).
+- Pin a specific version with `Netcap.Mcp@1.0.0-pre-NNN` (any version
+  visible on the [package page](https://github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp)).
 - Anything after the package name is passed straight to the tool, so
   `--stdio` (or `--http --port 3001`) lands on the server.
 - Requires the .NET 10 SDK on the machine running the MCP client.
 
 ## Install
 
-### As a global .NET tool
+### As a global .NET tool (from GitHub Packages)
 
 ```bash
-dotnet tool install --global Netcap.Mcp
+dotnet tool install --global Netcap.Mcp --source marcschier
 netcap-mcp --stdio                       # default
 netcap-mcp --http --port 3001            # ASP.NET Core HTTP transport
 netcap-mcp --help
 ```
+
+`--source marcschier` matches the source name added via `dotnet nuget
+add source` above. If you skipped that step, pass the feed URL inline:
+`--source https://nuget.pkg.github.com/marcschier/index.json` and ensure
+your credentials are in `~/.nuget/NuGet/NuGet.config`.
 
 ### From source
 
