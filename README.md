@@ -16,34 +16,24 @@ or runs in Docker.
 
 ## Packages
 
-Both packages are published to **GitHub Packages** (NuGet feed) for the
-`marcschier` user on every push to `main` by the
-[CI workflow](.github/workflows/ci.yml).
+Both packages are public, published to **GitHub Packages** (NuGet feed)
+on every push to `main` by the [CI workflow](.github/workflows/ci.yml).
+The feed is `https://nuget.pkg.github.com/marcschier/index.json`.
 
 | Package        | Feed                                                                                                       | Purpose                                                                                                                          |
 |----------------|------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
 | **`Netcap`**     | [github.com/marcschier/netcap/pkgs/nuget/Netcap](https://github.com/marcschier/netcap/pkgs/nuget/Netcap)         | Capture engine library — `ICaptureSource`, pcap & passive-http sources, pcap/pcapng/json/csv/text formatters, session manager.   |
 | **`Netcap.Mcp`** | [github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp](https://github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp) | MCP server that exposes the engine as MCP tools. Packaged as a `dotnet tool` with command **`netcap-mcp`** (stdio + HTTP).        |
 
-### Adding the GitHub Packages feed
-
-GitHub Packages NuGet **requires authentication even for public
-packages**. Generate a [classic personal access token](https://github.com/settings/tokens)
-with the `read:packages` scope (no other scope is needed for read-only
-consumption), then add the feed once:
+Add the feed to your NuGet sources once:
 
 ```bash
 dotnet nuget add source \
     --name marcschier \
-    --username <your-github-username> \
-    --password <YOUR_GITHUB_PAT_WITH_read:packages> \
-    --store-password-in-clear-text \
     "https://nuget.pkg.github.com/marcschier/index.json"
 ```
 
 After this, every example below works against the GitHub Packages feed.
-To use a different name for the source, replace `marcschier` and the
-`--source marcschier` flags accordingly.
 
 ## Features
 
@@ -66,9 +56,8 @@ To use a different name for the source, replace `marcschier` and the
 ## Register the MCP server in an MCP client via `dnx` (.NET 10)
 
 .NET 10 ships a `dnx` script that runs a .NET tool **without a global
-install** — a one-shot launcher in the spirit of `npx`. Once the
-GitHub Packages feed is configured (see above), wire `netcap-mcp` into
-an MCP client config like this:
+install** — a one-shot launcher in the spirit of `npx`. Wire
+`netcap-mcp` into an MCP client config like this:
 
 ```jsonc
 {
@@ -88,14 +77,13 @@ an MCP client config like this:
 
 Notes:
 - `dnx` forwards to `dotnet tool exec`. The first invocation downloads
-  the `Netcap.Mcp` package from the configured source(s); `--yes` skips
-  the per-download confirmation prompt.
-- The `--source` argument is only required if the GitHub Packages feed
-  is not already present in your global `NuGet.config`. If you ran
-  `dotnet nuget add source` above, you can omit it (and the global
-  credentials are picked up automatically).
-- Pin a specific version with `Netcap.Mcp@1.0.0-pre-NNN` (any version
-  visible on the [package page](https://github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp)).
+  the `Netcap.Mcp` package; `--yes` skips the per-download confirmation
+  prompt.
+- The `--source` argument can be omitted once the feed is added to your
+  global `NuGet.config` (see [Packages](#packages)).
+- Pin a specific version with `Netcap.Mcp@1.0.0-pre-NNN` — see the
+  [package page](https://github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp)
+  for available versions.
 - Anything after the package name is passed straight to the tool, so
   `--stdio` (or `--http --port 3001`) lands on the server.
 - Requires the .NET 10 SDK on the machine running the MCP client.
@@ -112,9 +100,8 @@ netcap-mcp --help
 ```
 
 `--source marcschier` matches the source name added via `dotnet nuget
-add source` above. If you skipped that step, pass the feed URL inline:
-`--source https://nuget.pkg.github.com/marcschier/index.json` and ensure
-your credentials are in `~/.nuget/NuGet/NuGet.config`.
+add source` above. Without that step you can pass the feed URL inline:
+`--source https://nuget.pkg.github.com/marcschier/index.json`.
 
 ### From source
 
