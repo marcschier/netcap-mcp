@@ -1,9 +1,9 @@
 # Netcap
 
-[![ci](https://github.com/marcschier/netcap/actions/workflows/ci.yml/badge.svg)](https://github.com/marcschier/netcap/actions/workflows/ci.yml)
+[![ci](https://github.com/marcschier/netcap-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/marcschier/netcap-mcp/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Netcap.Mcp on GitHub Packages](https://img.shields.io/badge/GitHub%20Packages-Netcap.Mcp-2088FF?logo=github)](https://github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp)
-[![Netcap on GitHub Packages](https://img.shields.io/badge/GitHub%20Packages-Netcap-2088FF?logo=github)](https://github.com/marcschier/netcap/pkgs/nuget/Netcap)
+[![Netcap.Mcp on GitHub Packages](https://img.shields.io/badge/GitHub%20Packages-Netcap.Mcp-2088FF?logo=github)](https://github.com/marcschier/netcap-mcp/pkgs/nuget/Netcap.Mcp)
+[![Netcap on GitHub Packages](https://img.shields.io/badge/GitHub%20Packages-Netcap-2088FF?logo=github)](https://github.com/marcschier/netcap-mcp/pkgs/nuget/Netcap)
 
 A **Model Context Protocol** server that captures network traces and
 returns them as **pcap**, **pcapng**, **JSON**, **CSV**, or **text** — driven
@@ -17,13 +17,14 @@ or runs in Docker.
 ## Packages
 
 Both packages are public, published to **GitHub Packages** (NuGet feed)
-on every push to `main` by the [CI workflow](.github/workflows/ci.yml).
+after successful Windows, Linux, and container qualification on pushes to
+`main` by the [CI workflow](.github/workflows/ci.yml).
 The feed is `https://nuget.pkg.github.com/marcschier/index.json`.
 
 | Package        | Feed                                                                                                       | Purpose                                                                                                                          |
 |----------------|------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| **`Netcap`**     | [github.com/marcschier/netcap/pkgs/nuget/Netcap](https://github.com/marcschier/netcap/pkgs/nuget/Netcap)         | Capture engine library — `ICaptureSource`, pcap & passive-http sources, pcap/pcapng/json/csv/text formatters, session manager.   |
-| **`Netcap.Mcp`** | [github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp](https://github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp) | MCP server that exposes the engine as MCP tools. Packaged as a `dotnet tool` with command **`netcap-mcp`** (stdio + HTTP).        |
+| **`Netcap`**     | [github.com/marcschier/netcap-mcp/pkgs/nuget/Netcap](https://github.com/marcschier/netcap-mcp/pkgs/nuget/Netcap)         | Capture engine library — `ICaptureSource`, pcap & passive-http sources, pcap/pcapng/json/csv/text formatters, session manager.   |
+| **`Netcap.Mcp`** | [github.com/marcschier/netcap-mcp/pkgs/nuget/Netcap.Mcp](https://github.com/marcschier/netcap-mcp/pkgs/nuget/Netcap.Mcp) | MCP server that exposes the engine as MCP tools. Packaged as a `dotnet tool` with command **`netcap-mcp`** (stdio + HTTP).        |
 
 Add the feed to your NuGet sources once:
 
@@ -34,6 +35,19 @@ dotnet nuget add source \
 ```
 
 After this, every example below works against the GitHub Packages feed.
+
+### Release 1.1.0
+
+This minor release includes the MCP SDK update from 1.4.1 in the last
+published release to 2.2.0, plus the latest stable hosting, build, and test
+dependencies. It retains .NET 10, xUnit v2, and the stable version channel.
+CI uses SDK 10.0.401; Docker pins SDK 10.0.401 and ASP.NET runtime 10.0.12
+to immutable image digests and installs libpcap from the image's distribution.
+
+Publishing checks the package version and source commit, rejects duplicate
+versions, and downloads both packages to verify their bytes against the
+qualified artifacts. This repository does not provide NuGet.org promotion
+or container-registry publication.
 
 ## Features
 
@@ -82,7 +96,7 @@ Notes:
 - The `--source` argument can be omitted once the feed is added to your
   global `NuGet.config` (see [Packages](#packages)).
 - Pin a specific version with `Netcap.Mcp@1.0.0-pre-NNN` — see the
-  [package page](https://github.com/marcschier/netcap/pkgs/nuget/Netcap.Mcp)
+  [package page](https://github.com/marcschier/netcap-mcp/pkgs/nuget/Netcap.Mcp)
   for available versions.
 - Anything after the package name is passed straight to the tool, so
   `--stdio` (or `--http --port 3001`) lands on the server.
@@ -106,8 +120,8 @@ add source` above. Without that step you can pass the feed URL inline:
 ### From source
 
 ```bash
-git clone https://github.com/marcschier/netcap.git
-cd netcap
+git clone https://github.com/marcschier/netcap-mcp.git
+cd netcap-mcp
 dotnet run --project src/Netcap.Mcp -- --stdio
 ```
 
@@ -212,7 +226,10 @@ dotnet pack   src/Netcap.Mcp/Netcap.Mcp.csproj -c Release -o artifacts
 ```
 
 CI runs the same on `ubuntu-latest` and `windows-latest` on every push
-to `main` and every pull request — see
+to `main` and every pull request. It also fails on known vulnerable
+transitive NuGet dependencies and builds the Docker image, initializes
+its MCP stdio transport, and exercises native libpcap interface enumeration.
+GitHub Packages publishing waits for all qualification jobs — see
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ## License
