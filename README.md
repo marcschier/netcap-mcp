@@ -36,18 +36,26 @@ dotnet nuget add source \
 
 After this, every example below works against the GitHub Packages feed.
 
-### Release 1.1.0
+### Release 1.1.1
 
-This minor release includes the MCP SDK update from 1.4.1 in the last
-published release to 2.2.0, plus the latest stable hosting, build, and test
-dependencies. It retains .NET 10, xUnit v2, and the stable version channel.
+This stable patch repairs publication verification: feed credentials
+authenticate only the initial canonical HTTPS feed request and are not
+forwarded to redirected package storage. It preserves the dependencies
+upgraded in 1.1.0: MCP SDK 2.2.0 (from 1.4.1 in 1.0.3), plus the hosting,
+build, and test dependencies. It retains .NET 10, xUnit v2, and the stable
+version channel.
 CI uses SDK 10.0.401; Docker pins SDK 10.0.401 and ASP.NET runtime 10.0.12
 to immutable image digests and installs libpcap from the image's distribution.
 
-Publishing checks the package version and source commit, rejects duplicate
-versions, and downloads both packages to verify their bytes against the
+Publishing checks the package version and source commit, checks both
+versions are unused before pushing, rejects duplicate versions, and downloads
+both packages over HTTPS to verify their bytes against the
 qualified artifacts. This repository does not provide NuGet.org promotion
 or container-registry publication.
+
+Both 1.1.0 packages were already published before their download verification
+failed; 1.1.1 uses a new source commit and leaves those immutable packages
+unchanged.
 
 ## Features
 
