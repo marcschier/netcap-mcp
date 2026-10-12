@@ -25,14 +25,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # required for Nerdbank.GitVersioning
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.401'
 
       - name: Install libpcap (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -41,7 +41,7 @@ jobs:
           sudo apt-get install -y libpcap-dev
 
       - name: Restore
-        run: dotnet restore --source https://api.nuget.org/v3/index.json
+        run: dotnet restore --source https://api.nuget.org/v3/index.json -p:NuGetAuditMode=all -warnaserror:NU1901,NU1902,NU1903,NU1904
 
       - name: Build
         run: dotnet build --configuration Release --no-restore
@@ -55,17 +55,118 @@ jobs:
 
       - name: Upload nupkg artifacts (Linux only)
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: netcap-nupkg
           path: artifacts/*.nupkg
           if-no-files-found: error
 
-      - name: Push nupkg to GitHub Packages (main pushes only)
-        if: |
-          matrix.os == 'ubuntu-latest' &&
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/main'
+  container:
+    name: container (Linux / libpcap)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build Docker image
+        run: docker build -t netcap-ci -f src/Netcap.Mcp/Dockerfile .
+
+      - name: Qualify MCP transport and native interface enumeration
+        run: |
+          python3 - <<'PY'
+          import json
+          import subprocess
+
+          process = subprocess.Popen(
+              ["docker", "run", "--rm", "-i", "--entrypoint", "dotnet",
+               "netcap-ci", "Netcap.Mcp.dll", "--stdio"],
+              stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+          def send(message):
+              process.stdin.write(json.dumps(message) + "\n")
+              process.stdin.flush()
+
+          def response(request_id):
+              while True:
+                  line = process.stdout.readline()
+                  if not line:
+                      raise RuntimeError("MCP process exited before replying")
+                  message = json.loads(line)
+                  if message.get("id") == request_id:
+                      if "error" in message:
+                          raise RuntimeError(message["error"])
+                      return message["result"]
+
+          try:
+              send({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                    "params": {"protocolVersion": "2025-11-25", "capabilities": {},
+                               "clientInfo": {"name": "container-ci", "version": "1.0"}}})
+              initialized = response(1)
+              assert initialized["serverInfo"]["name"]
+              send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+              send({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                    "params": {"name": "list_interfaces", "arguments": {}}})
+              result = response(2)
+              if result.get("isError"):
+                  raise RuntimeError(result)
+              interfaces = json.loads(next(
+                  item["text"] for item in result["content"] if item["type"] == "text"))
+              assert isinstance(interfaces, list) and interfaces, result
+              print(f"MCP initialized; libpcap enumerated {len(interfaces)} interfaces")
+          finally:
+              process.stdin.close()
+              process.wait()
+          if process.returncode != 0:
+              raise RuntimeError(f"Container exited with {process.returncode}")
+          PY
+
+  publish:
+    name: publish (GitHub Packages)
+    needs: [build, container]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.401'
+
+      - name: Download qualified packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: netcap-nupkg
+          path: artifacts
+
+      - name: Verify release version and source commit
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import xml.etree.ElementTree as ET
+          import zipfile
+
+          version = json.loads(pathlib.Path("version.json").read_text())["version"]
+          packages = list(pathlib.Path("artifacts").glob("*.nupkg"))
+          assert {p.name for p in packages} == {
+              f"Netcap.{version}.nupkg", f"Netcap.Mcp.{version}.nupkg"}
+          for package in packages:
+              with zipfile.ZipFile(package) as archive:
+                  nuspec = next(n for n in archive.namelist() if n.endswith(".nuspec"))
+                  root = ET.fromstring(archive.read(nuspec))
+                  metadata = root.find("{*}metadata")
+                  assert metadata.find("{*}version").text == version, package
+                  repository = metadata.find("{*}repository")
+                  assert repository.get("commit") == os.environ["SOURCE_COMMIT"], package
+                  assert repository.get("url") == "https://github.com/marcschier/netcap-mcp"
+              print(f"Verified {package.name}: source {os.environ['SOURCE_COMMIT']}")
+          PY
+
+      - name: Push new packages to GitHub Packages
         run: |
           dotnet nuget add source \
             --username ${{ github.repository_owner }} \
@@ -75,6 +176,38 @@ jobs:
             "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
           dotnet nuget push "artifacts/*.nupkg" \
             --source github \
-            --api-key ${{ secrets.GITHUB_TOKEN }} \
-            --skip-duplicate
+            --api-key ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify published package bytes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_OWNER: ${{ github.repository_owner }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import urllib.request
+
+          owner = os.environ["PACKAGE_OWNER"]
+          authorization = base64.b64encode(
+              f"{owner}:{os.environ['GH_TOKEN']}".encode()).decode()
+          def download(url):
+              request = urllib.request.Request(
+                  url, headers={"Authorization": f"Basic {authorization}"})
+              with urllib.request.urlopen(request) as response:
+                  return response.read()
+
+          index = json.loads(download(f"https://nuget.pkg.github.com/{owner}/index.json"))
+          base = next(r["@id"] for r in index["resources"]
+                      if r["@type"].startswith("PackageBaseAddress/")).rstrip("/")
+          version = json.loads(pathlib.Path("version.json").read_text())["version"]
+          for name in ("Netcap", "Netcap.Mcp"):
+              filename = f"{name}.{version}.nupkg"
+              published = download(f"{base}/{name.lower()}/{version}/{filename.lower()}")
+              expected = pathlib.Path("artifacts", filename).read_bytes()
+              assert hashlib.sha256(published).digest() == hashlib.sha256(expected).digest(), name
+              print(f"Verified GitHub Packages download: {filename} ({len(published)} bytes)")
+          PY
