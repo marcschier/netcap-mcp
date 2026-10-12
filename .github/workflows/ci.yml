@@ -159,6 +159,7 @@ jobs:
                   nuspec = next(n for n in archive.namelist() if n.endswith(".nuspec"))
                   root = ET.fromstring(archive.read(nuspec))
                   metadata = root.find("{*}metadata")
+                  assert metadata.find("{*}id").text == package.name.removesuffix(f".{version}.nupkg"), package
                   assert metadata.find("{*}version").text == version, package
                   repository = metadata.find("{*}repository")
                   assert repository.get("commit") == os.environ["SOURCE_COMMIT"], package
@@ -167,7 +168,29 @@ jobs:
           PY
 
       - name: Push new packages to GitHub Packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_OWNER: ${{ github.repository_owner }}
         run: |
+          version=$(python3 -c 'import json; print(json.load(open("version.json"))["version"])')
+          base=$(curl --fail --silent --show-error --user "$PACKAGE_OWNER:$GH_TOKEN" \
+            "https://nuget.pkg.github.com/$PACKAGE_OWNER/index.json" | python3 -c '
+          import json, urllib.parse, sys
+          base = next(r["@id"] for r in json.load(sys.stdin)["resources"]
+                      if r["@type"].startswith("PackageBaseAddress/")).rstrip("/")
+          target = urllib.parse.urlsplit(base)
+          assert target.scheme == "https" and target.hostname == "nuget.pkg.github.com" and target.port in (None, 443)
+          assert target.username is None and not target.query and not target.fragment
+          print(base)')
+          for package in Netcap Netcap.Mcp; do
+            curl --fail --silent --show-error --user "$PACKAGE_OWNER:$GH_TOKEN" \
+              "$base/${package,,}/index.json" | PACKAGE_ID="$package" PACKAGE_VERSION="$version" python3 -c '
+          import json, os, sys
+          versions = json.load(sys.stdin)["versions"]
+          assert isinstance(versions, list) and versions and all(isinstance(v, str) for v in versions)
+          assert os.environ["PACKAGE_VERSION"] not in versions, "Package version is already published"
+          print("Confirmed unused GitHub Packages version:", os.environ["PACKAGE_ID"], os.environ["PACKAGE_VERSION"])'
+          done
           dotnet nuget add source \
             --username ${{ github.repository_owner }} \
             --password ${{ secrets.GITHUB_TOKEN }} \
@@ -189,15 +212,31 @@ jobs:
           import json
           import os
           import pathlib
+          import urllib.parse
           import urllib.request
 
           owner = os.environ["PACKAGE_OWNER"]
+          feed_origin = ("https", "nuget.pkg.github.com", 443)
           authorization = base64.b64encode(
               f"{owner}:{os.environ['GH_TOKEN']}".encode()).decode()
+
+          class HttpsRedirectHandler(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, request, response, code, message, headers, newurl):
+                  target = urllib.parse.urlsplit(newurl)
+                  if target.scheme != "https" or not target.hostname or target.username is not None:
+                      raise ValueError("Package redirect must use HTTPS without user information")
+                  return super().redirect_request(request, response, code, message, headers, newurl)
+
+          opener = urllib.request.build_opener(HttpsRedirectHandler())
           def download(url):
-              request = urllib.request.Request(
-                  url, headers={"Authorization": f"Basic {authorization}"})
-              with urllib.request.urlopen(request) as response:
+              target = urllib.parse.urlsplit(url)
+              origin = (target.scheme, target.hostname, 443 if target.port is None else target.port)
+              if (origin != feed_origin or target.username is not None
+                      or target.query or target.fragment):
+                  raise ValueError("Package request must use the canonical HTTPS feed origin")
+              request = urllib.request.Request(url)
+              request.add_unredirected_header("Authorization", f"Basic {authorization}")
+              with opener.open(request) as response:
                   return response.read()
 
           index = json.loads(download(f"https://nuget.pkg.github.com/{owner}/index.json"))
