@@ -36,6 +36,17 @@ dotnet nuget add source \
 
 After this, every example below works against the GitHub Packages feed.
 
+### Release 1.1.2
+
+This stable servicing release updates the MCP SDK to 2.3.0, .NET runtime
+packages to 10.0.14, and the SDK to 10.0.403. It also updates the test SDK
+to 18.11.0. The Docker images are pinned to the verified immutable manifests
+for ASP.NET 10.0.14 and SDK 10.0.403. It preserves .NET 10, xUnit v2, and
+the existing stable version channel.
+
+The publication path remains GitHub Packages only; this repository does not
+provide NuGet.org promotion or container-registry publication.
+
 ### Release 1.1.1
 
 This stable patch repairs publication verification: feed credentials
